@@ -26,7 +26,7 @@ import javax.swing.table.DefaultTableModel;
  * регистратуры поликлиники с обработкой событий кнопок.
  *
  * @author Ражин Захар С. (кафедра ВТ)
- * @version 1.5
+ * @version 1.7
  */
 public class ClinicRegistryGUI {
 
