@@ -26,17 +26,9 @@ import javax.swing.table.DefaultTableModel;
  * регистратуры поликлиники с обработкой событий кнопок.
  *
  * @author Ражин Захар С. (кафедра ВТ)
- * @version 1.7
+ * @version 1.9
  */
 public class ClinicRegistryGUI {
-
-    public record Doctor(
-            String fullName,
-            String specialty,
-            String room,
-            Date startTime,
-            Date endTime
-    ) {}
 
     private final JFrame mainWindow;
     private final DefaultTableModel model;
@@ -51,7 +43,6 @@ public class ClinicRegistryGUI {
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm");
 
     public ClinicRegistryGUI() {
-
         mainWindow = new JFrame("Регистратура поликлиники - Управление расписанием");
         mainWindow.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         mainWindow.setSize(800, 400);
@@ -84,17 +75,8 @@ public class ClinicRegistryGUI {
         mainWindow.add(scrollPane, BorderLayout.CENTER);
     }
 
-
     /**
      * Метод настройки обработчиков событий (слушателей) для элементов управления.
-     * <p>
-     * Реализует следующую логику:
-     * <ul>
-     *   <li>Для кнопки "Добавить врача" вызывается диалоговое окно ввода данных. При успешном вводе
-     *       создается новый объект Doctor, обновляется модель таблицы и выводится информационное сообщение.</li>
-     *   <li>Для кнопки "Удалить" проверяется наличие выделенной строки. После подтверждения пользователем
-     *       запись удаляется из коллекции и интерфейса.</li>
-     * </ul>
      */
     private void setupListeners() {
         btnAddDoctor.addActionListener(e -> {
@@ -157,98 +139,95 @@ public class ClinicRegistryGUI {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new ClinicRegistryGUI().show());
     }
-}
 
-class InvalidDataException extends Exception {
-    public InvalidDataException(String message) {
-        super(message);
-    }
-}
+    /**
+     * Внутренний класс для отображения формы ввода данных.
+     */
+    private class DoctorDialog extends JDialog {
+        private final JTextField nameField = new JTextField(15);
+        private final JTextField specField = new JTextField(15);
+        private final JTextField roomField = new JTextField(5);
+        private final JTextField startField = new JTextField(5);
+        private final JTextField endField = new JTextField(5);
 
-class DoctorDialog extends JDialog {
-    private final JTextField nameField = new JTextField(15);
-    private final JTextField specField = new JTextField(15);
-    private final JTextField roomField = new JTextField(5);
-    private final JTextField startField = new JTextField(5);
-    private final JTextField endField = new JTextField(5);
+        private boolean confirmed = false;
+        private Doctor doctor;
 
-    private boolean confirmed = false;
-    private ClinicRegistryGUI.Doctor doctor;
+        public DoctorDialog(JFrame owner) {
+            super(owner, "Ввод данных нового врача", true);
 
-    public DoctorDialog(JFrame owner) {
-        super(owner, "Ввод данных нового врача", true);
+            JPanel panel = new JPanel(new GridLayout(6, 2, 10, 10));
+            panel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        JPanel panel = new JPanel(new GridLayout(6, 2, 10, 10));
-        panel.setBorder(new EmptyBorder(10, 10, 10, 10));
+            panel.add(new JLabel("ФИО:"));
+            panel.add(nameField);
+            panel.add(new JLabel("Специализация:"));
+            panel.add(specField);
+            panel.add(new JLabel("Кабинет:"));
+            panel.add(roomField);
+            panel.add(new JLabel("Начало смены (HH:mm):"));
+            panel.add(startField);
+            panel.add(new JLabel("Конец смены (HH:mm):"));
+            panel.add(endField);
 
-        panel.add(new JLabel("ФИО:"));
-        panel.add(nameField);
-        panel.add(new JLabel("Специализация:"));
-        panel.add(specField);
-        panel.add(new JLabel("Кабинет:"));
-        panel.add(roomField);
-        panel.add(new JLabel("Начало смены (HH:mm):"));
-        panel.add(startField);
-        panel.add(new JLabel("Конец смены (HH:mm):"));
-        panel.add(endField);
+            JButton btnSave = new JButton("Сохранить");
+            JButton btnCancel = new JButton("Отмена");
 
-        JButton btnSave = new JButton("Сохранить");
-        JButton btnCancel = new JButton("Отмена");
+            btnSave.addActionListener(e -> {
+                try {
+                    String name = nameField.getText().trim();
+                    String spec = specField.getText().trim();
+                    String room = roomField.getText().trim();
 
-        btnSave.addActionListener(e -> {
-            try {
-                String name = nameField.getText().trim();
-                String spec = specField.getText().trim();
-                String room = roomField.getText().trim();
+                    if (name.isEmpty() || spec.isEmpty() || room.isEmpty()) {
+                        throw new InvalidDataException("Все текстовые поля (ФИО, Специализация, Кабинет) обязательны для заполнения.");
+                    }
 
-                if (name.isEmpty() || spec.isEmpty() || room.isEmpty()) {
-                    throw new InvalidDataException("Все текстовые поля (ФИО, Специализация, Кабинет) обязательны для заполнения.");
+                    SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
+                    sdf.setLenient(false);
+                    Date startTime = sdf.parse(startField.getText().trim());
+                    Date endTime = sdf.parse(endField.getText().trim());
+
+                    if (!startTime.before(endTime)) {
+                        throw new InvalidDataException("Время начала смены должно быть строго раньше времени её окончания.");
+                    }
+
+                    doctor = new Doctor(name, spec, room, startTime, endTime);
+                    confirmed = true;
+                    dispose();
+
+                } catch (ParseException ex) {
+                    JOptionPane.showMessageDialog(this,
+                            "Некорректный формат времени. Ожидается ЧЧ:ММ (например, 08:00).",
+                            "Ошибка ввода",
+                            JOptionPane.ERROR_MESSAGE);
+                } catch (InvalidDataException ex) {
+                    JOptionPane.showMessageDialog(this,
+                            ex.getMessage(),
+                            "Ошибка данных",
+                            JOptionPane.WARNING_MESSAGE);
                 }
+            });
 
-                SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
-                sdf.setLenient(false);
-                Date startTime = sdf.parse(startField.getText().trim());
-                Date endTime = sdf.parse(endField.getText().trim());
+            btnCancel.addActionListener(e -> dispose());
 
-                if (!startTime.before(endTime)) {
-                    throw new InvalidDataException("Время начала смены должно быть строго раньше времени её окончания.");
-                }
+            JPanel buttonsPanel = new JPanel();
+            buttonsPanel.add(btnSave);
+            buttonsPanel.add(btnCancel);
 
-                doctor = new ClinicRegistryGUI.Doctor(name, spec, room, startTime, endTime);
-                confirmed = true;
-                dispose();
+            add(panel, BorderLayout.CENTER);
+            add(buttonsPanel, BorderLayout.SOUTH);
 
-            } catch (ParseException ex) {
-                JOptionPane.showMessageDialog(this,
-                        "Некорректный формат времени. Ожидается ЧЧ:ММ (например, 08:00).",
-                        "Ошибка ввода",
-                        JOptionPane.ERROR_MESSAGE);
-            } catch (InvalidDataException ex) {
-                JOptionPane.showMessageDialog(this,
-                        ex.getMessage(),
-                        "Ошибка данных",
-                        JOptionPane.WARNING_MESSAGE);
-            }
-        });
+            pack();
+            setLocationRelativeTo(owner);
+        }
 
-        btnCancel.addActionListener(e -> dispose());
+        public boolean isConfirmed() {
+            return confirmed;
+        }
 
-        JPanel buttonsPanel = new JPanel();
-        buttonsPanel.add(btnSave);
-        buttonsPanel.add(btnCancel);
-
-        add(panel, BorderLayout.CENTER);
-        add(buttonsPanel, BorderLayout.SOUTH);
-
-        pack();
-        setLocationRelativeTo(owner);
-    }
-
-    public boolean isConfirmed() {
-        return confirmed;
-    }
-
-    public ClinicRegistryGUI.Doctor getDoctor() {
-        return doctor;
+        public Doctor getDoctor() {
+            return doctor;
+        }
     }
 }

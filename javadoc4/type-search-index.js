@@ -1,0 +1,1 @@
+typeSearchIndex = [{"l":"All Classes and Interfaces","u":"allclasses-index.html"},{"p":"com.engine","l":"ClinicRegistryGUI"},{"p":"com.engine","l":"Doctor"},{"p":"com.engine","l":"InvalidDataException"}];updateSearchResults();
