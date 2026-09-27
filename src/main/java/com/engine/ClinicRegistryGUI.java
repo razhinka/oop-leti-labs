@@ -1,7 +1,9 @@
 package com.engine;
 
 import java.awt.BorderLayout;
+import java.awt.FileDialog;
 import java.awt.GridLayout;
+import java.io.File;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -26,7 +28,7 @@ import javax.swing.table.DefaultTableModel;
  * регистратуры поликлиники с обработкой событий кнопок.
  *
  * @author Ражин Захар С. (кафедра ВТ)
- * @version 1.9
+ * @version 2.0
  */
 public class ClinicRegistryGUI {
 
@@ -38,9 +40,14 @@ public class ClinicRegistryGUI {
     private JToolBar toolBar;
     private final JButton btnAddDoctor;
     private final JButton btnDeleteDoctor;
+    private final JButton btnSave;
+    private final JButton btnLoad;
 
     private final List<Doctor> doctorsList = new ArrayList<>();
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm");
+
+    // Внедрение репозитория для работы с данными
+    private final Repository<Doctor> repository = new CsvDoctorRepository();
 
     public ClinicRegistryGUI() {
         mainWindow = new JFrame("Регистратура поликлиники - Управление расписанием");
@@ -51,9 +58,14 @@ public class ClinicRegistryGUI {
         toolBar = new JToolBar("Управление записями");
         btnAddDoctor = new JButton("Добавить врача");
         btnDeleteDoctor = new JButton("Удалить");
+        btnSave = new JButton("Сохранить в CSV");
+        btnLoad = new JButton("Загрузить из CSV");
 
         toolBar.add(btnAddDoctor);
         toolBar.add(btnDeleteDoctor);
+        toolBar.addSeparator();
+        toolBar.add(btnLoad);
+        toolBar.add(btnSave);
 
         String[] columnNames = {"ФИО врача", "Специализация", "Кабинет", "Часы приёма"};
 
@@ -115,6 +127,51 @@ public class ClinicRegistryGUI {
                         "Пожалуйста, выберите запись в таблице.",
                         "Ошибка",
                         JOptionPane.WARNING_MESSAGE);
+            }
+        });
+
+        // Слушатель для сохранения данных
+        btnSave.addActionListener(e -> {
+            FileDialog save = new FileDialog(mainWindow, "Сохранение данных", FileDialog.SAVE); // Создание окна сохранения файла
+            save.setFile("*.csv"); // Установка начального имени/шаблона файла
+            save.setVisible(true); // Визуализация окна
+
+            String dir = save.getDirectory(); // Получение выбранного каталога
+            String fileName = save.getFile(); // Получение выбранного имени файла
+
+            if (dir == null || fileName == null) return; // Если пользователь нажал "Отмена"
+
+            if (!fileName.toLowerCase().endsWith(".csv")) {
+                fileName += ".csv";
+            }
+
+            try {
+                repository.save(doctorsList, new File(dir, fileName));
+                JOptionPane.showMessageDialog(mainWindow, "Данные успешно сохранены!", "Успех", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(mainWindow, "Ошибка при сохранении: " + ex.getMessage(), "Ошибка", JOptionPane.ERROR_MESSAGE); // Обработка ошибки ввода-вывода
+            }
+        });
+
+        // Слушатель для загрузки данных
+        btnLoad.addActionListener(e -> {
+            FileDialog load = new FileDialog(mainWindow, "Загрузка данных", FileDialog.LOAD); // Создание окна загрузки файла
+            load.setFile("*.csv"); // Установка шаблона для поиска
+            load.setVisible(true); // Визуализация окна
+
+            String dir = load.getDirectory(); // Получение выбранного каталога
+            String fileName = load.getFile(); // Получение выбранного имени файла
+
+            if (dir == null || fileName == null) return; // Если пользователь нажал "Отмена"
+
+            try {
+                List<Doctor> loadedDoctors = repository.load(new File(dir, fileName));
+                doctorsList.clear();
+                doctorsList.addAll(loadedDoctors);
+                updateTableModel();
+                JOptionPane.showMessageDialog(mainWindow, "Данные успешно загружены!", "Успех", JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(mainWindow, "Ошибка при загрузке: " + ex.getMessage(), "Ошибка", JOptionPane.ERROR_MESSAGE); // Обработка ошибки ввода-вывода
             }
         });
     }
