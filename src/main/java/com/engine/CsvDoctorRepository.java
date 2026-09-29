@@ -14,7 +14,7 @@ public class CsvDoctorRepository implements Repository<Doctor> {
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm");
 
     @Override
-    public void save(List<Doctor> items, File file) throws IOException {
+    public void save(List<Doctor> items, File file) throws Exception {
         try (PrintWriter writer = new PrintWriter(new FileWriter(file))) { // Использование PrintWriter и FileWriter
             writer.println("ФИО,Специализация,Кабинет,Начало смены,Конец смены");
             for (Doctor doc : items) {
@@ -28,7 +28,7 @@ public class CsvDoctorRepository implements Repository<Doctor> {
     }
 
     @Override
-    public List<Doctor> load(File file) throws IOException {
+    public List<Doctor> load(File file) throws Exception {
         List<Doctor> result = new ArrayList<>();
         if (!file.exists()) return result; // Проверка существования файла
 

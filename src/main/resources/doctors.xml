@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<doctors>
+    <doctor endTime="12:00" fullName="Ром" room="123" specialty="терапевт" startTime="10:00"/>
+</doctors>
