@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?><doctors>
+<doctor endTime="14:00" fullName="Быков Андрей Евгеньевич" room="125" specialty="Терапевт" startTime="08:00"/>
+<doctor endTime="20:00" fullName="Лобанов Семен Семенович" room="112" specialty="Терапевт" startTime="14:00"/>
+<doctor endTime="18:00" fullName="Купитман Иван Натанович" room="39" specialty="Уролог" startTime="10:00"/>
+<doctor endTime="17:00" fullName="Кисегач Анастасия Константиновна" room="201" specialty="Главврач" startTime="09:00"/>
+<doctor endTime="16:00" fullName="Романенко Глеб Алексеевич" room="120" specialty="Интерн" startTime="08:00"/>
+<doctor endTime="15:30" fullName="Черноус Варвара Николаевна" room="105" specialty="Педиатр" startTime="08:30"/>
+<doctor endTime="16:00" fullName="Левин Борис Аркадьевич" room="314" specialty="Невролог" startTime="09:00"/>
+<doctor endTime="18:00" fullName="Смирнова Анна Александровна" room="205" specialty="Офтальмолог" startTime="11:00"/>
+<doctor endTime="15:00" fullName="Кузнецов Василий Петрович" room="312" specialty="Хирург" startTime="08:00"/>
+<doctor endTime="19:00" fullName="Морозов Дмитрий Сергеевич" room="220" specialty="Кардиолог" startTime="12:00"/>
+</doctors>
