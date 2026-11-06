@@ -1,30 +1,33 @@
 package com.engine;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
 
 /**
- * Обобщенный интерфейс репозитория для сохранения и загрузки сущностей.
+ * Обобщенный интерфейс репозитория для сохранения и загрузки коллекций сущностей.
+ * Реализует паттерн Data Access Object (DAO) / Repository для абстрагирования источников данных.
  *
  * @param <T> тип сохраняемой сущности
- * @author Ражин Захар С. (кафедра ВТ)
+ * @author Ражин Захар 5312
+ * @version 1.0
  */
 public interface Repository<T> {
 
     /**
-     * Сохраняет список сущностей в целевой файл.
+     * Сохраняет список сущностей в целевой файл на диске.
      *
      * @param items список объектов для сохранения
-     * @throws IOException при ошибках записи
+     * @param file  целевой файл для записи
+     * @throws Exception при ошибках ввода-вывода или сериализации
      */
     void save(List<T> items, File file) throws Exception;
 
     /**
      * Загружает список сущностей из указанного файла.
      *
+     * @param file исходный файл для чтения данных
      * @return список прочитанных объектов
-     * @throws IOException при ошибках чтения или повреждении формата
+     * @throws Exception при ошибках ввода-вывода или повреждении формата
      */
     List<T> load(File file) throws Exception;
 }

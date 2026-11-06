@@ -26,11 +26,12 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
 
 /**
- * Класс ClinicRegistryGUI реализует графический интерфейс
- * регистратуры поликлиники с поддержкой XML, фильтрации записей и генерации отчетов.
+ * Класс ClinicRegistryGUI реализует графический интерфейс пользователя
+ * регистратуры поликлиники с поддержкой сериализации в XML, фильтрации записей,
+ * формирования отчетов в JasperReports и синхронизированной многопоточной обработки данных.
  *
- * @author Ражин Захар С. (кафедра ВТ)
- * @version 2.2
+ * @author Ражин Захар 5312
+ * @version 3.0
  */
 public class ClinicRegistryGUI {
 
@@ -40,13 +41,15 @@ public class ClinicRegistryGUI {
     private final TableRowSorter<DefaultTableModel> sorter;
 
     private final JButton btnAddDoctor;
+    private final JButton btnEditDoctor;
     private final JButton btnDeleteDoctor;
     private final JButton btnSave;
     private final JButton btnLoad;
     private final JButton btnReportPdf;
     private final JButton btnReportHtml;
+    private final JButton btnRunThreads;
 
-    // Компоненты нижнего бара поиска
+    // Компоненты панели поиска и фильтрации
     private final JComboBox<String> specialtyFilter;
     private final JTextField doctorSearchField;
     private final JButton btnSearch;
@@ -57,24 +60,27 @@ public class ClinicRegistryGUI {
 
     /**
      * Конструктор главного окна приложения.
-     * Инициализирует компоненты интерфейса, таблицу, сортировщик и нижнюю панель поиска.
+     * Выполняет компоновку элементов интерфейса, настройку таблицы и панели фильтров.
      */
     public ClinicRegistryGUI() {
         mainWindow = new JFrame("Регистратура поликлиники - Управление расписанием");
         mainWindow.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        mainWindow.setSize(900, 450);
+        mainWindow.setSize(980, 480);
         mainWindow.setLocationRelativeTo(null);
 
-        // Верхняя панель инструментов (локальная переменная)
+        // Верхняя панель инструментов
         JToolBar toolBar = new JToolBar("Управление записями");
         btnAddDoctor = new JButton("Добавить врача");
+        btnEditDoctor = new JButton("Редактировать");
         btnDeleteDoctor = new JButton("Удалить");
         btnLoad = new JButton("Загрузить из XML");
         btnSave = new JButton("Сохранить в XML");
         btnReportPdf = new JButton("Отчет PDF");
         btnReportHtml = new JButton("Отчет HTML");
+        btnRunThreads = new JButton("Потоки (Лаб. 8)");
 
         toolBar.add(btnAddDoctor);
+        toolBar.add(btnEditDoctor);
         toolBar.add(btnDeleteDoctor);
         toolBar.addSeparator();
         toolBar.add(btnLoad);
@@ -82,6 +88,8 @@ public class ClinicRegistryGUI {
         toolBar.addSeparator();
         toolBar.add(btnReportPdf);
         toolBar.add(btnReportHtml);
+        toolBar.addSeparator();
+        toolBar.add(btnRunThreads);
 
         // Таблица и модель данных
         String[] columnNames = {"ФИО врача", "Специализация", "Кабинет", "Часы приёма"};
@@ -97,7 +105,7 @@ public class ClinicRegistryGUI {
         doctorsTable.setRowSorter(sorter);
         JScrollPane scrollPane = new JScrollPane(doctorsTable);
 
-        // Нижняя панель поиска (локальная переменная)
+        // Нижняя панель поиска
         JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
         specialtyFilter = new JComboBox<>(new String[]{"Все специализации"});
         doctorSearchField = new JTextField(20);
@@ -121,7 +129,7 @@ public class ClinicRegistryGUI {
     }
 
     /**
-     * Настраивает слушателей событий для кнопок панели инструментов и нижней панели поиска.
+     * Настраивает слушателей событий для интерактивных компонентов интерфейса.
      */
     private void setupListeners() {
         // Добавление врача
@@ -139,7 +147,33 @@ public class ClinicRegistryGUI {
             }
         });
 
-        // Удаление врача (с учетом активного фильтра поиска)
+        // Редактирование выбранного врача
+        btnEditDoctor.addActionListener(e -> {
+            int selectedViewRow = doctorsTable.getSelectedRow();
+            if (selectedViewRow != -1) {
+                int modelRow = doctorsTable.convertRowIndexToModel(selectedViewRow);
+                Doctor currentDoctor = doctorsList.get(modelRow);
+
+                DoctorDialog dialog = new DoctorDialog(mainWindow, currentDoctor);
+                dialog.setVisible(true);
+
+                if (dialog.isConfirmed()) {
+                    doctorsList.set(modelRow, dialog.getDoctor());
+                    updateTableModel();
+                    JOptionPane.showMessageDialog(mainWindow,
+                            "Данные врача успешно обновлены.",
+                            "Успех",
+                            JOptionPane.INFORMATION_MESSAGE);
+                }
+            } else {
+                JOptionPane.showMessageDialog(mainWindow,
+                        "Пожалуйста, выберите запись в таблице для редактирования.",
+                        "Предупреждение",
+                        JOptionPane.WARNING_MESSAGE);
+            }
+        });
+
+        // Удаление врача
         btnDeleteDoctor.addActionListener(e -> {
             int selectedViewRow = doctorsTable.getSelectedRow();
             if (selectedViewRow != -1) {
@@ -218,15 +252,75 @@ public class ClinicRegistryGUI {
         btnReportPdf.addActionListener(e -> generateReport("pdf"));
         btnReportHtml.addActionListener(e -> generateReport("html"));
 
+        // Запуск трех синхронизированных потоков (Лабораторная работа № 8)
+        btnRunThreads.addActionListener(e -> startParallelThreads());
+
         // Слушатели нижнего бара поиска
         btnSearch.addActionListener(e -> applyFilter());
-        doctorSearchField.addActionListener(e -> applyFilter()); // Поиск по нажатию Enter
+        doctorSearchField.addActionListener(e -> applyFilter());
 
         btnResetSearch.addActionListener(e -> {
             specialtyFilter.setSelectedIndex(0);
             doctorSearchField.setText("");
             sorter.setRowFilter(null);
         });
+    }
+
+    /**
+     * Организует параллельную работу трех синхронизированных потоков через {@link MultithreadingService}:
+     * 1-й поток загружает данные из XML-файла в экранную форму;
+     * 2-й поток ожидает завершения загрузки, редактирует данные и сохраняет отдельный XML-файл;
+     * 3-й поток ожидает записи отредактированного XML-файла и строит HTML-отчет.
+     */
+    @SuppressWarnings("SpellCheckingInspection")
+    private void startParallelThreads() {
+        File sourceXml = new File("doctors.xml");
+        File editedXml = new File("doctors_edited.xml");
+        File reportHtml = new File("doctors_report_multithread.html");
+        String templatePath = "doctors_report.jrxml";
+
+        MultithreadingService service = new MultithreadingService();
+        service.runPipelineAsync(
+                sourceXml,
+                editedXml,
+                reportHtml,
+                templatePath,
+                doctorsList,
+                new MultithreadingService.MultithreadCallback() {
+                    @Override
+                    public void onLoaded(List<Doctor> loadedDoctors) {
+                        SwingUtilities.invokeLater(ClinicRegistryGUI.this::updateTableModel);
+                    }
+
+                    @Override
+                    public void onEdited(List<Doctor> editedDoctors) {
+                        SwingUtilities.invokeLater(ClinicRegistryGUI.this::updateTableModel);
+                    }
+
+                    @Override
+                    public void onCompleted(File reportFile) {
+                        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(
+                                mainWindow,
+                                "Многопоточная обработка успешно завершена!\n\n" +
+                                        "1. Поток 1 загрузил исходный файл: " + sourceXml.getName() + "\n" +
+                                        "2. Поток 2 обновил данные и создал: " + editedXml.getName() + "\n" +
+                                        "3. Поток 3 сформировал HTML-отчет: " + reportHtml.getName(),
+                                "Результат работы потоков (Лаб. 8)",
+                                JOptionPane.INFORMATION_MESSAGE
+                        ));
+                    }
+
+                    @Override
+                    public void onError(int threadNumber, String stage, Throwable error) {
+                        SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(
+                                mainWindow,
+                                "Ошибка в Потоке " + threadNumber + " (" + stage + "): " + error.getMessage(),
+                                "Ошибка многопоточности",
+                                JOptionPane.ERROR_MESSAGE
+                        ));
+                    }
+                }
+        );
     }
 
     /**
@@ -239,12 +333,10 @@ public class ClinicRegistryGUI {
 
         List<RowFilter<Object, Object>> filters = new ArrayList<>();
 
-        // Фильтр по специализации (колонка с индексом 1)
         if (selectedSpecialty != null && !"Все специализации".equals(selectedSpecialty)) {
             filters.add(RowFilter.regexFilter("^" + Pattern.quote(selectedSpecialty) + "$", 1));
         }
 
-        // Фильтр по текстовому полю (ищет совпадения в ФИО или номере кабинета без учета регистра)
         if (!searchText.isEmpty()) {
             filters.add(RowFilter.regexFilter("(?i)" + Pattern.quote(searchText), 0, 2));
         }
@@ -279,7 +371,6 @@ public class ClinicRegistryGUI {
             File reportFile = new File(fd.getDirectory(), fd.getFile());
             File tempXml = new File("doctors_temp_datasource.xml");
             try {
-                // Сохраняем актуальные данные в XML-файл источника
                 new XmlDoctorRepository().save(doctorsList, tempXml);
 
                 String templateName = "doctors_report.jrxml";
@@ -350,10 +441,23 @@ public class ClinicRegistryGUI {
 
     /**
      * Точка входа в приложение.
+     * При передаче аргумента {@code --run-threads} выполняет синхронный запуск
+     * трех потоков для проверки работы без открытия GUI.
      *
      * @param args аргументы командной строки
      */
     public static void main(String[] args) {
+        if (args.length > 0 && "--run-threads".equals(args[0])) {
+            System.out.println("Выполнение многопоточной обработки данных (Лабораторная работа № 8)...");
+            MultithreadingService service = new MultithreadingService();
+            File sourceXml = new File("doctors.xml");
+            File editedXml = new File("doctors_edited.xml");
+            File reportHtml = new File("doctors_report_multithread.html");
+            String templatePath = "doctors_report.jrxml";
+            service.runPipelineSync(sourceXml, editedXml, reportHtml, templatePath, new ArrayList<>(), null);
+            System.out.println("Многопоточная обработка успешно завершена.");
+            return;
+        }
         SwingUtilities.invokeLater(() -> new ClinicRegistryGUI().show());
     }
 }

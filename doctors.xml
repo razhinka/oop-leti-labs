@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?><doctors>
+<doctor endTime="14:00" fullName="Быков Андрей Евгеньевич" room="125" specialty="Терапевт" startTime="08:00"/>
+<doctor endTime="18:00" fullName="Купитман Иван Натанович" room="39" specialty="Уролог" startTime="10:00"/>
+<doctor endTime="15:30" fullName="Черноус Варвара Николаевна" room="105" specialty="Педиатр" startTime="08:30"/>
+</doctors>

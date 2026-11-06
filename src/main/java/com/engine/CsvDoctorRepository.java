@@ -1,21 +1,43 @@
 package com.engine;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Реализация репозитория для сущности Doctor в формате CSV.
+ * Реализация репозитория для сущности Doctor с использованием текстового формата CSV.
+ * Для потоковой записи и чтения задействованы классы {@link PrintWriter}, {@link FileWriter},
+ * {@link BufferedReader} и {@link FileReader}.
+ *
+ * @author Ражин Захар 5312
+ * @version 1.0
  */
 public class CsvDoctorRepository implements Repository<Doctor> {
 
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm");
 
+    /**
+     * Создает новый экземпляр репозитория CSV-данных.
+     */
+    public CsvDoctorRepository() {
+    }
+
+    /**
+     * Сохраняет список врачей в CSV-файл с экранированием специальных символов.
+     *
+     * @param items список врачей для сохранения
+     * @param file  целевой файл CSV
+     * @throws Exception при ошибке ввода-вывода
+     */
     @Override
     public void save(List<Doctor> items, File file) throws Exception {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(file))) { // Использование PrintWriter и FileWriter
+        try (PrintWriter writer = new PrintWriter(new FileWriter(file))) {
             writer.println("ФИО,Специализация,Кабинет,Начало смены,Конец смены");
             for (Doctor doc : items) {
                 writer.print(escapeCSV(doc.fullName()) + ",");
@@ -27,12 +49,21 @@ public class CsvDoctorRepository implements Repository<Doctor> {
         }
     }
 
+    /**
+     * Считывает данные врачей из CSV-файла с пропуском строки заголовка.
+     *
+     * @param file исходный файл CSV
+     * @return список прочитанных объектов Doctor
+     * @throws Exception при повреждении структуры файла или неверном формате даты
+     */
     @Override
     public List<Doctor> load(File file) throws Exception {
         List<Doctor> result = new ArrayList<>();
-        if (!file.exists()) return result; // Проверка существования файла
+        if (!file.exists()) {
+            return result;
+        }
 
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) { // Использование BufferedReader и FileReader
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
             boolean first = true;
             while ((line = reader.readLine()) != null) {
@@ -58,10 +89,15 @@ public class CsvDoctorRepository implements Repository<Doctor> {
     }
 
     /**
-     * Экранирование значений для CSV.
+     * Экранирование строковых значений для безопасного сохранения в CSV.
+     *
+     * @param value исходное строковое значение
+     * @return экранированная строка
      */
     private String escapeCSV(String value) {
-        if (value == null) return "";
+        if (value == null) {
+            return "";
+        }
         if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
@@ -69,7 +105,10 @@ public class CsvDoctorRepository implements Repository<Doctor> {
     }
 
     /**
-     * Парсинг строки CSV с поддержкой кавычек.
+     * Разбор строки формата CSV с учетом закавыченных полей и разделителей-запятых.
+     *
+     * @param line строка CSV
+     * @return массив значений колонок
      */
     private String[] parseCSVLine(String line) {
         List<String> result = new ArrayList<>();

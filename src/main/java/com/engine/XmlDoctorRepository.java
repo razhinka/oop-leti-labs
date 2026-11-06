@@ -19,12 +19,30 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Реализация репозитория для сущности Doctor в формате XML.
+ * Реализация репозитория для сущности Doctor с использованием формата XML.
+ * Для чтения и формирования структуры XML-документа применяется W3C DOM-парсер
+ * ({@link DocumentBuilder}, {@link Document}, {@link Transformer}).
+ *
+ * @author Ражин Захар 5312
+ * @version 1.0
  */
 public class XmlDoctorRepository implements Repository<Doctor> {
 
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm");
 
+    /**
+     * Создает новый экземпляр репозитория XML-данных.
+     */
+    public XmlDoctorRepository() {
+    }
+
+    /**
+     * Сериализует список врачей в XML-файл с отступами.
+     *
+     * @param items список врачей для сохранения
+     * @param file  целевой XML-файл
+     * @throws Exception при ошибке создания DOM-дерева или трансформации в файл
+     */
     @Override
     public void save(List<Doctor> items, File file) throws Exception {
         // Создание фабрики и DOM-парсера
@@ -61,6 +79,13 @@ public class XmlDoctorRepository implements Repository<Doctor> {
         transformer.transform(source, result);
     }
 
+    /**
+     * Загружает список врачей из XML-файла с разбором DOM-структуры.
+     *
+     * @param file исходный XML-файл
+     * @return коллекция десериализованных объектов Doctor
+     * @throws Exception при ошибке разбора XML или парсинга формата времени
+     */
     @Override
     public List<Doctor> load(File file) throws Exception {
         List<Doctor> result = new ArrayList<>();
