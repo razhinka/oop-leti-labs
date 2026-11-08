@@ -87,32 +87,15 @@ public class DoctorDialog extends JDialog {
 
         btnSave.addActionListener(e -> {
             try {
-                String name = nameField.getText().trim();
-                String spec = specField.getText().trim();
-                String room = roomField.getText().trim();
-
-                if (name.isEmpty() || spec.isEmpty() || room.isEmpty()) {
-                    throw new InvalidDataException("Все текстовые поля (ФИО, Специализация, Кабинет) обязательны для заполнения.");
-                }
-
-                SimpleDateFormat sdf = new SimpleDateFormat("HH:mm");
-                sdf.setLenient(false);
-                Date startTime = sdf.parse(startField.getText().trim());
-                Date endTime = sdf.parse(endField.getText().trim());
-
-                if (!startTime.before(endTime)) {
-                    throw new InvalidDataException("Время начала смены должно быть строго раньше времени её окончания.");
-                }
-
-                doctor = new Doctor(name, spec, room, startTime, endTime);
+                doctor = DoctorValidator.validate(
+                        nameField.getText(),
+                        specField.getText(),
+                        roomField.getText(),
+                        startField.getText(),
+                        endField.getText()
+                );
                 confirmed = true;
                 dispose();
-
-            } catch (ParseException ex) {
-                JOptionPane.showMessageDialog(this,
-                        "Некорректный формат времени. Ожидается ЧЧ:ММ (например, 08:00).",
-                        "Ошибка ввода",
-                        JOptionPane.ERROR_MESSAGE);
             } catch (InvalidDataException ex) {
                 JOptionPane.showMessageDialog(this,
                         ex.getMessage(),
