@@ -1,6 +1,8 @@
 package com.engine;
 
 import net.sf.jasperreports.engine.JRException;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.awt.BorderLayout;
 import java.awt.FileDialog;
@@ -29,11 +31,14 @@ import javax.swing.table.TableRowSorter;
  * Класс ClinicRegistryGUI реализует графический интерфейс пользователя
  * регистратуры поликлиники с поддержкой сериализации в XML, фильтрации записей,
  * формирования отчетов в JasperReports и синхронизированной многопоточной обработки данных.
+ * Все взаимодействия и события интерфейса протоколируются с помощью Log4j.
  *
  * @author Ражин Захар 5312
  * @version 3.0
  */
 public class ClinicRegistryGUI {
+
+    private static final Logger logger = LogManager.getLogger(ClinicRegistryGUI.class);
 
     private final JFrame mainWindow;
     private final DefaultTableModel model;
@@ -63,6 +68,7 @@ public class ClinicRegistryGUI {
      * Выполняет компоновку элементов интерфейса, настройку таблицы и панели фильтров.
      */
     public ClinicRegistryGUI() {
+        logger.info("Инициализация графического интерфейса ClinicRegistryGUI...");
         mainWindow = new JFrame("Регистратура поликлиники - Управление расписанием");
         mainWindow.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         mainWindow.setSize(980, 480);
@@ -126,6 +132,7 @@ public class ClinicRegistryGUI {
         mainWindow.add(toolBar, BorderLayout.NORTH);
         mainWindow.add(scrollPane, BorderLayout.CENTER);
         mainWindow.add(searchPanel, BorderLayout.SOUTH);
+        logger.info("Компоновка компонентов GUI успешно завершена");
     }
 
     /**
@@ -134,11 +141,13 @@ public class ClinicRegistryGUI {
     private void setupListeners() {
         // Добавление врача
         btnAddDoctor.addActionListener(e -> {
+            logger.info("Пользователь нажал кнопку 'Добавить врача'");
             DoctorDialog dialog = new DoctorDialog(mainWindow);
             dialog.setVisible(true);
 
             if (dialog.isConfirmed()) {
                 doctorsList.add(dialog.getDoctor());
+                logger.info("В список GUI добавлен врач: {}", dialog.getDoctor().fullName());
                 updateTableModel();
                 JOptionPane.showMessageDialog(mainWindow,
                         "Запись о враче успешно добавлена.",
@@ -149,16 +158,19 @@ public class ClinicRegistryGUI {
 
         // Редактирование выбранного врача
         btnEditDoctor.addActionListener(e -> {
+            logger.info("Пользователь нажал кнопку 'Редактировать'");
             int selectedViewRow = doctorsTable.getSelectedRow();
             if (selectedViewRow != -1) {
                 int modelRow = doctorsTable.convertRowIndexToModel(selectedViewRow);
                 Doctor currentDoctor = doctorsList.get(modelRow);
+                logger.debug("Открытие формы редактирования для врача: {}", currentDoctor.fullName());
 
                 DoctorDialog dialog = new DoctorDialog(mainWindow, currentDoctor);
                 dialog.setVisible(true);
 
                 if (dialog.isConfirmed()) {
                     doctorsList.set(modelRow, dialog.getDoctor());
+                    logger.info("Врач на позиции {} обновлен: {}", modelRow, dialog.getDoctor().fullName());
                     updateTableModel();
                     JOptionPane.showMessageDialog(mainWindow,
                             "Данные врача успешно обновлены.",
@@ -166,6 +178,7 @@ public class ClinicRegistryGUI {
                             JOptionPane.INFORMATION_MESSAGE);
                 }
             } else {
+                logger.warn("Попытка редактирования без выбора записи в таблице");
                 JOptionPane.showMessageDialog(mainWindow,
                         "Пожалуйста, выберите запись в таблице для редактирования.",
                         "Предупреждение",
@@ -175,6 +188,7 @@ public class ClinicRegistryGUI {
 
         // Удаление врача
         btnDeleteDoctor.addActionListener(e -> {
+            logger.info("Пользователь нажал кнопку 'Удалить'");
             int selectedViewRow = doctorsTable.getSelectedRow();
             if (selectedViewRow != -1) {
                 int choice = JOptionPane.showConfirmDialog(
@@ -185,7 +199,8 @@ public class ClinicRegistryGUI {
                 );
                 if (choice == JOptionPane.YES_OPTION) {
                     int modelRow = doctorsTable.convertRowIndexToModel(selectedViewRow);
-                    doctorsList.remove(modelRow);
+                    Doctor removed = doctorsList.remove(modelRow);
+                    logger.info("Удален врач из списка GUI: {}", removed != null ? removed.fullName() : "null");
                     updateTableModel();
                     JOptionPane.showMessageDialog(mainWindow,
                             "Врач удален.",
@@ -193,6 +208,7 @@ public class ClinicRegistryGUI {
                             JOptionPane.INFORMATION_MESSAGE);
                 }
             } else {
+                logger.warn("Попытка удаления без выбора записи в таблице");
                 JOptionPane.showMessageDialog(mainWindow,
                         "Пожалуйста, выберите запись в таблице.",
                         "Ошибка",
@@ -202,6 +218,7 @@ public class ClinicRegistryGUI {
 
         // Загрузка из XML
         btnLoad.addActionListener(e -> {
+            logger.info("Пользователь нажал кнопку 'Загрузить из XML'");
             FileDialog fd = new FileDialog(mainWindow, "Загрузить расписание из XML", FileDialog.LOAD);
             fd.setFile("*.xml");
             fd.setVisible(true);
@@ -212,11 +229,13 @@ public class ClinicRegistryGUI {
                     doctorsList.clear();
                     doctorsList.addAll(repo.load(file));
                     updateTableModel();
+                    logger.info("Данные успешно загружены из XML в форму GUI: {}", file.getAbsolutePath());
                     JOptionPane.showMessageDialog(mainWindow,
                             "Данные успешно загружены из XML.",
                             "Успех",
                             JOptionPane.INFORMATION_MESSAGE);
                 } catch (Exception ex) {
+                    logger.error("Ошибка при чтении XML: {}", ex.getMessage(), ex);
                     JOptionPane.showMessageDialog(mainWindow,
                             "Ошибка при чтении XML: " + ex.getMessage(),
                             "Ошибка",
@@ -227,6 +246,7 @@ public class ClinicRegistryGUI {
 
         // Сохранение в XML
         btnSave.addActionListener(e -> {
+            logger.info("Пользователь нажал кнопку 'Сохранить в XML'");
             FileDialog fd = new FileDialog(mainWindow, "Сохранить расписание в XML", FileDialog.SAVE);
             fd.setFile("doctors.xml");
             fd.setVisible(true);
@@ -235,11 +255,13 @@ public class ClinicRegistryGUI {
                 try {
                     Repository<Doctor> repo = new XmlDoctorRepository();
                     repo.save(doctorsList, file);
+                    logger.info("Данные GUI успешно сохранены в XML: {}", file.getAbsolutePath());
                     JOptionPane.showMessageDialog(mainWindow,
                             "Данные успешно сохранены в XML.",
                             "Успех",
                             JOptionPane.INFORMATION_MESSAGE);
                 } catch (Exception ex) {
+                    logger.error("Ошибка при сохранении XML: {}", ex.getMessage(), ex);
                     JOptionPane.showMessageDialog(mainWindow,
                             "Ошибка при сохранении XML: " + ex.getMessage(),
                             "Ошибка",
@@ -260,6 +282,7 @@ public class ClinicRegistryGUI {
         doctorSearchField.addActionListener(e -> applyFilter());
 
         btnResetSearch.addActionListener(e -> {
+            logger.debug("Сброс фильтрации таблицы");
             specialtyFilter.setSelectedIndex(0);
             doctorSearchField.setText("");
             sorter.setRowFilter(null);
@@ -274,6 +297,7 @@ public class ClinicRegistryGUI {
      */
     @SuppressWarnings("SpellCheckingInspection")
     private void startParallelThreads() {
+        logger.info("Запуск многопоточного пайплайна (Лаб. 8/10)...");
         File sourceXml = new File("doctors.xml");
         File editedXml = new File("doctors_edited.xml");
         File reportHtml = new File("doctors_report_multithread.html");
@@ -289,16 +313,19 @@ public class ClinicRegistryGUI {
                 new MultithreadingService.MultithreadCallback() {
                     @Override
                     public void onLoaded(List<Doctor> loadedDoctors) {
+                        logger.debug("Callback onLoaded: обновление GUI таблицы");
                         SwingUtilities.invokeLater(ClinicRegistryGUI.this::updateTableModel);
                     }
 
                     @Override
                     public void onEdited(List<Doctor> editedDoctors) {
+                        logger.debug("Callback onEdited: обновление GUI таблицы");
                         SwingUtilities.invokeLater(ClinicRegistryGUI.this::updateTableModel);
                     }
 
                     @Override
                     public void onCompleted(File reportFile) {
+                        logger.info("Callback onCompleted: многопоточный пайплайн успешно завершен");
                         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(
                                 mainWindow,
                                 "Многопоточная обработка успешно завершена!\n\n" +
@@ -312,6 +339,7 @@ public class ClinicRegistryGUI {
 
                     @Override
                     public void onError(int threadNumber, String stage, Throwable error) {
+                        logger.error("Callback onError: сбой в потоке {} на этапе {}: {}", threadNumber, stage, error.getMessage(), error);
                         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(
                                 mainWindow,
                                 "Ошибка в Потоке " + threadNumber + " (" + stage + "): " + error.getMessage(),
@@ -330,6 +358,7 @@ public class ClinicRegistryGUI {
     private void applyFilter() {
         String selectedSpecialty = (String) specialtyFilter.getSelectedItem();
         String searchText = doctorSearchField.getText().trim();
+        logger.debug("Применение фильтрации в GUI: специальность='{}', поиск='{}'", selectedSpecialty, searchText);
 
         List<RowFilter<Object, Object>> filters = new ArrayList<>();
 
@@ -355,7 +384,9 @@ public class ClinicRegistryGUI {
      */
     @SuppressWarnings("SpellCheckingInspection")
     private void generateReport(String format) {
+        logger.info("Запрос генерации отчета в формате {}", format.toUpperCase());
         if (doctorsList.isEmpty()) {
+            logger.warn("Попытка генерации отчета при пустом списке врачей");
             JOptionPane.showMessageDialog(mainWindow,
                     "Таблица пуста. Добавьте или загрузите записи перед созданием отчета.",
                     "Предупреждение",
@@ -381,16 +412,19 @@ public class ClinicRegistryGUI {
                         reportFile.getAbsolutePath()
                 );
 
+                logger.info("Отчет успешно сохранен в: {}", reportFile.getAbsolutePath());
                 JOptionPane.showMessageDialog(mainWindow,
                         "Отчет успешно сформирован:\n" + reportFile.getAbsolutePath(),
                         "Успех",
                         JOptionPane.INFORMATION_MESSAGE);
             } catch (JRException ex) {
+                logger.error("Ошибка JasperReports: {}", ex.getMessage(), ex);
                 JOptionPane.showMessageDialog(mainWindow,
                         "Ошибка JasperReports при формировании отчета: " + ex.getMessage(),
                         "Ошибка",
                         JOptionPane.ERROR_MESSAGE);
             } catch (Exception ex) {
+                logger.error("Ошибка при подготовке отчета: {}", ex.getMessage(), ex);
                 JOptionPane.showMessageDialog(mainWindow,
                         "Ошибка при подготовке данных отчета: " + ex.getMessage(),
                         "Ошибка",
@@ -430,6 +464,7 @@ public class ClinicRegistryGUI {
         if (currentSelection != null && addedSpecialties.contains(currentSelection)) {
             specialtyFilter.setSelectedItem(currentSelection);
         }
+        logger.debug("Модель таблицы обновлена. Строк: {}, Специализаций: {}", doctorsList.size(), addedSpecialties.size());
     }
 
     /**
@@ -447,7 +482,9 @@ public class ClinicRegistryGUI {
      * @param args аргументы командной строки
      */
     public static void main(String[] args) {
+        logger.info("Запуск приложения 'Регистратура поликлиники'");
         if (args.length > 0 && "--run-threads".equals(args[0])) {
+            logger.info("Режим аргументов командной строки: запуск трех потоков (--run-threads)");
             System.out.println("Выполнение многопоточной обработки данных (Лабораторная работа № 8)...");
             MultithreadingService service = new MultithreadingService();
             File sourceXml = new File("doctors.xml");

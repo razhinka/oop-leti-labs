@@ -1,5 +1,8 @@
 package com.engine;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
@@ -10,9 +13,7 @@ import javax.swing.JTextField;
 import javax.swing.border.EmptyBorder;
 import java.awt.BorderLayout;
 import java.awt.GridLayout;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
 
 /**
  * Модальное диалоговое окно для добавления новой записи о враче
@@ -23,6 +24,8 @@ import java.util.Date;
  * @version 1.0
  */
 public class DoctorDialog extends JDialog {
+
+    private static final Logger logger = LogManager.getLogger(DoctorDialog.class);
 
     /** Текстовое поле для ввода ФИО врача. */
     private final JTextField nameField = new JTextField(15);
@@ -57,6 +60,7 @@ public class DoctorDialog extends JDialog {
      */
     public DoctorDialog(JFrame owner, Doctor existingDoctor) {
         super(owner, existingDoctor == null ? "Ввод данных нового врача" : "Редактирование данных врача", true);
+        logger.debug("Открытие диалогового окна врача: режим={}", existingDoctor == null ? "создание" : "редактирование");
 
         JPanel panel = new JPanel(new GridLayout(6, 2, 10, 10));
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
@@ -86,6 +90,7 @@ public class DoctorDialog extends JDialog {
         JButton btnCancel = new JButton("Отмена");
 
         btnSave.addActionListener(e -> {
+            logger.debug("Пользователь нажал 'Сохранить' в диалоге врача");
             try {
                 doctor = DoctorValidator.validate(
                         nameField.getText(),
@@ -95,13 +100,16 @@ public class DoctorDialog extends JDialog {
                         endField.getText()
                 );
                 confirmed = true;
+                logger.debug("Данные врача в диалоге успешно проверены: {}", doctor.fullName());
                 dispose();
             } catch (InvalidDataException ex) {
+                logger.warn("Ошибка валидации в диалоговом окне: {}", ex.getMessage());
                 JOptionPane.showMessageDialog(this,
                         ex.getMessage(),
                         "Ошибка данных",
                         JOptionPane.WARNING_MESSAGE);
             } catch (Exception ex) {
+                logger.error("Непредвиденная ошибка в диалоговом окне: {}", ex.getMessage(), ex);
                 JOptionPane.showMessageDialog(this,
                         "Непредвиденная ошибка: " + ex.getMessage(),
                         "Ошибка",
@@ -109,7 +117,10 @@ public class DoctorDialog extends JDialog {
             }
         });
 
-        btnCancel.addActionListener(e -> dispose());
+        btnCancel.addActionListener(e -> {
+            logger.debug("Пользователь отменил диалог ввода врача");
+            dispose();
+        });
 
         JPanel buttonsPanel = new JPanel();
         buttonsPanel.add(btnSave);

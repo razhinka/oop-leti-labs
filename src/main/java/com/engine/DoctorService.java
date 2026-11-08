@@ -1,5 +1,8 @@
 package com.engine;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,6 +18,7 @@ import java.util.List;
  */
 public class DoctorService {
 
+    private static final Logger logger = LogManager.getLogger(DoctorService.class);
     private final List<Doctor> doctors;
 
     /**
@@ -42,6 +46,7 @@ public class DoctorService {
     public void addDoctor(Doctor doctor) throws InvalidDataException {
         DoctorValidator.validate(doctor);
         doctors.add(doctor);
+        logger.info("Врач успешно добавлен в реестр: {}", doctor.fullName());
     }
 
     /**
@@ -53,9 +58,12 @@ public class DoctorService {
      */
     public Doctor removeDoctor(int index) {
         if (index < 0 || index >= doctors.size()) {
+            logger.warn("Попытка удаления врача по некорректному индексу: {}", index);
             throw new IndexOutOfBoundsException("Индекс записи выходит за допустимые границы: " + index);
         }
-        return doctors.remove(index);
+        Doctor removed = doctors.remove(index);
+        logger.info("Удален врач по индексу {}: {}", index, removed.fullName());
+        return removed;
     }
 
     /**
@@ -65,7 +73,13 @@ public class DoctorService {
      * @return true, если запись была найдена и удалена; false в противном случае
      */
     public boolean removeDoctor(Doctor doctor) {
-        return doctors.remove(doctor);
+        boolean removed = doctors.remove(doctor);
+        if (removed && doctor != null) {
+            logger.info("Удален врач из реестра: {}", doctor.fullName());
+        } else {
+            logger.warn("Попытка удаления отсутствующего врача: {}", doctor);
+        }
+        return removed;
     }
 
     /**
@@ -78,10 +92,12 @@ public class DoctorService {
      */
     public void updateDoctor(int index, Doctor updatedDoctor) throws InvalidDataException {
         if (index < 0 || index >= doctors.size()) {
+            logger.warn("Попытка обновления врача по некорректному индексу: {}", index);
             throw new IndexOutOfBoundsException("Индекс записи выходит за допустимые границы: " + index);
         }
         DoctorValidator.validate(updatedDoctor);
         doctors.set(index, updatedDoctor);
+        logger.info("Данные врача по индексу {} успешно обновлены: {}", index, updatedDoctor.fullName());
     }
 
     /**
@@ -106,7 +122,9 @@ public class DoctorService {
      * Очищает список врачей.
      */
     public void clear() {
+        int count = doctors.size();
         doctors.clear();
+        logger.info("Реестр врачей очищен (удалено {} записей)", count);
     }
 
     /**
@@ -119,6 +137,7 @@ public class DoctorService {
         if (newDoctors != null) {
             doctors.addAll(newDoctors);
         }
+        logger.debug("Установлен новый список врачей: {} записей", doctors.size());
     }
 
     /**
@@ -129,6 +148,7 @@ public class DoctorService {
      * @return отфильтрованный список врачей
      */
     public List<Doctor> filter(String specialty, String query) {
+        logger.debug("Фильтрация врачей: специальность='{}', поисковый запрос='{}'", specialty, query);
         List<Doctor> result = new ArrayList<>();
         String normalizedQuery = query != null ? query.trim().toLowerCase() : "";
         boolean filterSpecialty = specialty != null && !specialty.trim().isEmpty() && !"Все специализации".equalsIgnoreCase(specialty.trim());
@@ -143,6 +163,7 @@ public class DoctorService {
                 result.add(doc);
             }
         }
+        logger.debug("Результат фильтрации: найдено {} записей из {}", result.size(), doctors.size());
         return result;
     }
 
@@ -155,10 +176,13 @@ public class DoctorService {
      */
     public void load(Repository<Doctor> repository, File file) throws Exception {
         if (repository == null) {
+            logger.error("Ошибка загрузки: репозиторий равен null");
             throw new IllegalArgumentException("Репозиторий не может быть null.");
         }
+        logger.info("Загрузка данных из файла {} через {}", file != null ? file.getName() : "null", repository.getClass().getSimpleName());
         List<Doctor> loaded = repository.load(file);
         setDoctors(loaded);
+        logger.info("Успешно загружено {} врачей", loaded != null ? loaded.size() : 0);
     }
 
     /**
@@ -170,8 +194,11 @@ public class DoctorService {
      */
     public void save(Repository<Doctor> repository, File file) throws Exception {
         if (repository == null) {
+            logger.error("Ошибка сохранения: репозиторий равен null");
             throw new IllegalArgumentException("Репозиторий не может быть null.");
         }
+        logger.info("Сохранение {} врачей в файл {} через {}", doctors.size(), file != null ? file.getName() : "null", repository.getClass().getSimpleName());
         repository.save(doctors, file);
+        logger.info("Данные успешно сохранены в файл: {}", file != null ? file.getName() : "null");
     }
 }

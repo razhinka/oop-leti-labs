@@ -1,5 +1,8 @@
 package com.engine;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -7,7 +10,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 /**
- * Сервис многопоточной обработки данных регистратуры поликлиники (Лабораторная работа № 8).
+ * Сервис многопоточной обработки данных регистратуры поликлиники (Лабораторная работа № 8 и № 10).
  * Организует строго синхронизированную работу трех независимых потоков исполнения:
  * <ul>
  *     <li><b>Поток 1 (Loader):</b> считывает список врачей из исходного XML-файла и передает его в общую модель данных;</li>
@@ -15,12 +18,14 @@ import java.util.concurrent.CountDownLatch;
  *     <li><b>Поток 3 (Reporter):</b> ожидает сохранения отредактированного XML-файла и компилирует на его основе HTML-отчет через JasperReports.</li>
  * </ul>
  * Синхронизация очередности выполнения потоков реализована с помощью примитивов {@link CountDownLatch}.
+ * Все этапы и межпоточные события протоколируются через Apache Log4j (уровни DEBUG, INFO, WARN, ERROR).
  *
  * @author Ражин Захар 5312
  * @version 1.0
  */
 public class MultithreadingService {
 
+    private static final Logger logger = LogManager.getLogger(MultithreadingService.class);
     private final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm");
 
     /**
@@ -74,6 +79,7 @@ public class MultithreadingService {
      */
     public void prepareDefaultSourceXmlIfAbsent(File sourceXml) throws Exception {
         if (!sourceXml.exists()) {
+            logger.warn("Исходный XML-файл не найден: {}. Создается демонстрационный набор данных...", sourceXml.getAbsolutePath());
             List<Doctor> initialData = new ArrayList<>();
             initialData.add(new Doctor("Быков Андрей Евгеньевич", "Терапевт", "125",
                     timeFormat.parse("08:00"), timeFormat.parse("14:00")));
@@ -82,6 +88,7 @@ public class MultithreadingService {
             initialData.add(new Doctor("Черноус Варвара Николаевна", "Педиатр", "105",
                     timeFormat.parse("08:30"), timeFormat.parse("15:30")));
             new XmlDoctorRepository().save(initialData, sourceXml);
+            logger.info("Демонстрационный XML-файл успешно подготовлен: {}", sourceXml.getName());
         }
     }
 
@@ -104,6 +111,7 @@ public class MultithreadingService {
             List<Doctor> targetList,
             MultithreadCallback callback
     ) {
+        logger.info("Инициализация асинхронного запуска многопоточного пайплайна (Лаб. 8, Лаб. 10)...");
         startThreads(sourceXml, editedXml, reportHtml, templatePath, targetList, callback, false);
     }
 
@@ -126,6 +134,7 @@ public class MultithreadingService {
             List<Doctor> targetList,
             MultithreadCallback callback
     ) {
+        logger.info("Инициализация синхронного запуска многопоточного пайплайна...");
         startThreads(sourceXml, editedXml, reportHtml, templatePath, targetList, callback, true);
     }
 
@@ -152,6 +161,7 @@ public class MultithreadingService {
         try {
             prepareDefaultSourceXmlIfAbsent(sourceXml);
         } catch (Exception e) {
+            logger.error("Ошибка при подготовке исходного XML-файла: {}", e.getMessage(), e);
             if (callback != null) {
                 callback.onError(1, "Подготовка исходного XML", e);
             }
@@ -164,7 +174,7 @@ public class MultithreadingService {
         // Поток 1: Загрузка данных из исходного XML-файла
         Thread loadThread = new Thread(() -> {
             try {
-                System.out.println("[Поток 1] Старт загрузки данных из файла: " + sourceXml.getName());
+                logger.info("[Поток 1] Старт загрузки данных из файла: {}", sourceXml.getName());
                 Repository<Doctor> repo = new XmlDoctorRepository();
                 List<Doctor> loaded = repo.load(sourceXml);
 
@@ -173,18 +183,20 @@ public class MultithreadingService {
                     targetList.addAll(loaded);
                 }
 
-                Thread.sleep(300); // Имитация времени чтения с диска
-                System.out.println("[Поток 1] Загрузка успешно завершена, записей: " + loaded.size());
+                logger.debug("[Поток 1] Прочитано {} записей из исходного файла, имитация I/O задержки (300 мс)...", loaded.size());
+                Thread.sleep(300);
+                logger.info("[Поток 1] Загрузка успешно завершена, записей: {}", loaded.size());
 
                 if (callback != null) {
                     callback.onLoaded(new ArrayList<>(loaded));
                 }
             } catch (Throwable ex) {
-                System.err.println("[Поток 1] Ошибка загрузки: " + ex.getMessage());
+                logger.error("[Поток 1] Ошибка загрузки данных из XML: {}", ex.getMessage(), ex);
                 if (callback != null) {
                     callback.onError(1, "Загрузка данных из XML", ex);
                 }
             } finally {
+                logger.debug("[Поток 1] Сброс защелки loadCompletedLatch...");
                 loadCompletedLatch.countDown();
             }
         }, "Loader-Thread-1");
@@ -192,49 +204,53 @@ public class MultithreadingService {
         // Поток 2: Редактирование данных и сохранение нового XML-файла
         Thread editThread = new Thread(() -> {
             try {
-                System.out.println("[Поток 2] Ожидание завершения загрузки первым потоком...");
+                logger.debug("[Поток 2] Ожидание завершения загрузки первым потоком (loadCompletedLatch.await)...");
                 loadCompletedLatch.await();
 
-                System.out.println("[Поток 2] Начало модификации данных...");
+                logger.info("[Поток 2] Начало модификации данных...");
                 List<Doctor> snapshot;
                 synchronized (targetList) {
-                    // Изменяем номер кабинета первой записи
                     if (!targetList.isEmpty()) {
                         Doctor first = targetList.getFirst();
-                        targetList.set(0, new Doctor(
+                        Doctor updatedFirst = new Doctor(
                                 first.fullName(),
                                 first.specialty(),
                                 first.room() + " (обновл.)",
                                 first.startTime(),
                                 first.endTime()
-                        ));
+                        );
+                        targetList.set(0, updatedFirst);
+                        logger.debug("[Поток 2] Обновлен кабинет первой записи: '{}' -> '{}'", first.room(), updatedFirst.room());
                     }
 
-                    // Добавляем запись нового дежурного врача
-                    targetList.add(new Doctor(
+                    Doctor newDoctor = new Doctor(
                             "Павлова Ирина Алексеевна",
                             "Хирург",
                             "301",
                             timeFormat.parse("09:00"),
                             timeFormat.parse("17:00")
-                    ));
+                    );
+                    targetList.add(newDoctor);
+                    logger.debug("[Поток 2] Добавлена новая запись: {} ({}, каб. {})", newDoctor.fullName(), newDoctor.specialty(), newDoctor.room());
 
                     snapshot = new ArrayList<>(targetList);
                     new XmlDoctorRepository().save(snapshot, editedXml);
                 }
 
-                Thread.sleep(300); // Имитация времени записи
-                System.out.println("[Поток 2] Отредактированный XML сохранен: " + editedXml.getName());
+                logger.debug("[Поток 2] Сохранение отредактированного списка ({} записей), задержка I/O (300 мс)...", snapshot.size());
+                Thread.sleep(300);
+                logger.info("[Поток 2] Отредактированный XML успешно сохранен: {}", editedXml.getName());
 
                 if (callback != null) {
                     callback.onEdited(snapshot);
                 }
             } catch (Throwable ex) {
-                System.err.println("[Поток 2] Ошибка модификации: " + ex.getMessage());
+                logger.error("[Поток 2] Ошибка модификации или сохранения данных: {}", ex.getMessage(), ex);
                 if (callback != null) {
                     callback.onError(2, "Модификация и выгрузка в XML", ex);
                 }
             } finally {
+                logger.debug("[Поток 2] Сброс защелки editCompletedLatch...");
                 editCompletedLatch.countDown();
             }
         }, "Editor-Thread-2");
@@ -242,10 +258,10 @@ public class MultithreadingService {
         // Поток 3: Построение HTML-отчета через JasperReports
         Thread reportThread = new Thread(() -> {
             try {
-                System.out.println("[Поток 3] Ожидание сохранения XML-файла вторым потоком...");
+                logger.debug("[Поток 3] Ожидание сохранения XML-файла вторым потоком (editCompletedLatch.await)...");
                 editCompletedLatch.await();
 
-                System.out.println("[Поток 3] Формирование HTML-отчета по файлу: " + editedXml.getName());
+                logger.info("[Поток 3] Формирование HTML-отчета по файлу: {}", editedXml.getName());
                 ReportService.buildReport(
                         editedXml.getAbsolutePath(),
                         "/doctors/doctor",
@@ -253,12 +269,12 @@ public class MultithreadingService {
                         reportHtml.getAbsolutePath()
                 );
 
-                System.out.println("[Поток 3] HTML-отчет успешно сформирован: " + reportHtml.getAbsolutePath());
+                logger.info("[Поток 3] HTML-отчет успешно сформирован: {}", reportHtml.getAbsolutePath());
                 if (callback != null) {
                     callback.onCompleted(reportHtml);
                 }
             } catch (Throwable ex) {
-                System.err.println("[Поток 3] Ошибка построения отчета: " + ex.getMessage());
+                logger.error("[Поток 3] Ошибка построения HTML-отчета: {}", ex.getMessage(), ex);
                 if (callback != null) {
                     callback.onError(3, "Генерация HTML-отчета", ex);
                 }
@@ -266,6 +282,7 @@ public class MultithreadingService {
         }, "Reporter-Thread-3");
 
         // Запуск потоков
+        logger.debug("Запуск параллельных потоков: Loader, Editor, Reporter...");
         loadThread.start();
         editThread.start();
         reportThread.start();
@@ -275,9 +292,10 @@ public class MultithreadingService {
                 loadThread.join();
                 editThread.join();
                 reportThread.join();
+                logger.info("Все три потока успешно завершили работу (join).");
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                System.err.println("Ожидание завершения потоков было прервано: " + e.getMessage());
+                logger.warn("Ожидание завершения потоков было прервано: {}", e.getMessage());
             }
         }
     }
